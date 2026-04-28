@@ -2,12 +2,45 @@ import React from "react";
 import { C } from "../constants";
 
 export function LogLine({ e }) {
-  const colors = { info: C.muted, process: C.blue, success: C.green, error: C.red, warning: C.amber };
-  const icons = { info: "›", process: "⟳", success: "✓", error: "✕", warning: "⚠" };
+  const colors = {
+    info: C.muted,
+    process: C.blue,
+    success: C.green,
+    error: C.red,
+    warning: C.amber,
+  };
+  const icons = {
+    info: "›",
+    process: "⟳",
+    success: "✓",
+    error: "✕",
+    warning: "⚠",
+  };
+  const textColors = {
+    error: C.red,
+    success: C.green,
+    warning: C.amber,
+    process: C.text,
+    info: C.text,
+  };
+
+  const timestamp = e.ts
+    ? new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 1 })
+    : null;
+
   return (
-    <div style={{ display: "flex", gap: 8, padding: "3px 0", borderLeft: `2px solid ${colors[e.type] || C.muted}`, paddingLeft: 10, marginLeft: 2 }}>
-      <span style={{ color: colors[e.type], fontFamily: "monospace", fontSize: 11, minWidth: 12 }}>{icons[e.type]}</span>
-      <span style={{ color: e.type === "error" ? C.red : e.type === "success" ? C.green : e.type === "warning" ? C.amber : C.text, fontFamily: "monospace", fontSize: 11, lineHeight: 1.4 }}>{e.msg}</span>
+    <div
+      className="log-line"
+      style={{ borderLeftColor: colors[e.type] || C.muted }}
+      role="listitem"
+    >
+      <span className="log-icon" style={{ color: colors[e.type] }}>
+        {icons[e.type] || "›"}
+      </span>
+      <span className="log-text" style={{ color: textColors[e.type] || C.text }}>
+        {e.msg}
+      </span>
+      {timestamp && <span className="log-timestamp">{timestamp}</span>}
     </div>
   );
 }

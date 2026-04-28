@@ -15,7 +15,10 @@ export default function App() {
   const telemRef = useRef(null);
 
   const log = useCallback((msg, type = "info") => {
-    setTelemetry(p => [...p, { id: Date.now() + Math.random(), msg, type }]);
+    setTelemetry((p) => [
+      ...p,
+      { id: Date.now() + Math.random(), msg, type, ts: Date.now() },
+    ]);
   }, []);
 
   const {
@@ -28,13 +31,19 @@ export default function App() {
     setLang,
     metrics,
     lastAgentText,
-    handleSend
+    handleSend,
   } = useChat(domain, log);
 
   const { listening, speak, toggleVoiceInput } = useVoice(lang, log);
 
   useEffect(() => {
-    setMessages([{ role: "agent", content: DOMAINS[domain].greeting }]);
+    setMessages([
+      {
+        role: "agent",
+        content: DOMAINS[domain].greeting,
+        timestamp: Date.now(),
+      },
+    ]);
     setTelemetry([]);
     setSentiment(null);
     setLang("English");

@@ -3,9 +3,10 @@ import { C } from "../constants";
 
 export function MetCard({ label, value, color }) {
   return (
-    <div style={{ background: C.dim, borderRadius: 8, padding: "10px 14px", flex: 1, minWidth: 80 }}>
-      <div style={{ fontSize: 18, fontWeight: 600, color: color || C.text, fontFamily: "monospace" }}>{value}</div>
-      <div style={{ fontSize: 10, color: C.muted, marginTop: 2, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+    <div className="met-card" role="status" aria-label={`${label}: ${value}`}>
+      <div className="met-card-stripe" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color || C.teal, borderRadius: '2px 2px 0 0', opacity: 0.5 }} />
+      <div className="met-value" style={{ color: color || C.text }}>{value}</div>
+      <div className="met-label">{label}</div>
     </div>
   );
 }

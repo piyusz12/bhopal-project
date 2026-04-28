@@ -1,5 +1,8 @@
-from sqlalchemy import Boolean, Column, Float, Integer, String, Text
+from datetime import datetime, timezone
+
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text
 from .database import Base
+
 
 class ChatLog(Base):
     __tablename__ = "chat_logs"
@@ -14,3 +17,7 @@ class ChatLog(Base):
     sentiment_score = Column(Float)
     language = Column(String(50))
     requires_escalation = Column(Boolean)
+    confidence = Column(Float, nullable=True)
+    rag_sources = Column(Text, nullable=True)  # JSON-encoded list
+    routing_model = Column(String(30), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

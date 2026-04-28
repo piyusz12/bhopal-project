@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 
@@ -18,9 +19,51 @@ class ChatResponse(BaseModel):
     rag_sources: list[str]
     response: str
     tool_events: list[str]
+    routing_model: str = "fast"
+    query_expansions: list[str] = []
 
 
 class HealthResponse(BaseModel):
     status: str
     llm_configured: bool
     supported_domains: list[str]
+    version: str = "2.0.0"
+    features: list[str] = []
+
+
+class StreamEvent(BaseModel):
+    """Schema for SSE token streaming events."""
+    type: str  # "token", "metadata", "done", "error"
+    data: str = ""
+    metadata: dict | None = None
+
+
+class ChatHistoryItem(BaseModel):
+    id: int
+    session_id: str
+    domain: str
+    user_message: str
+    response: str
+    intent: str
+    sentiment: str
+    sentiment_score: float
+    language: str
+    requires_escalation: bool
+    confidence: float | None = None
+    created_at: datetime | None = None
+
+
+class ChatHistoryResponse(BaseModel):
+    session_id: str
+    total: int
+    messages: list[ChatHistoryItem]
+
+
+class MetricsResponse(BaseModel):
+    total_queries: int
+    avg_latency_ms: float
+    total_escalations: int
+    total_pii_blocks: int
+    domain_distribution: dict[str, int]
+    sentiment_distribution: dict[str, int]
+    top_intents: dict[str, int]

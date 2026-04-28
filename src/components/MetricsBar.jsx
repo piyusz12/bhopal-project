@@ -4,15 +4,32 @@ import { MetCard } from "./MetCard";
 
 export function MetricsBar({ metrics, sentiment, lang, accent }) {
   return (
-    <div className="metrics-bar">
+    <div className="metrics-bar" role="status" aria-label="System metrics">
       <MetCard label="Queries" value={metrics.queries} color={accent} />
       <MetCard label="Avg Latency" value={metrics.queries > 0 ? `${metrics.avgMs}ms` : "—"} color={C.teal} />
       <MetCard label="PII Blocked" value={metrics.pii} color={C.red} />
       <MetCard label="Escalations" value={metrics.escalations} color={C.amber} />
+      <MetCard
+        label="Routing"
+        value={metrics.lastRouting || "—"}
+        color={metrics.lastRouting === "deep" ? C.purple : C.blue}
+      />
       {sentiment && (
-        <div style={{ background: sentiment.conf.bg, border: `1px solid ${sentiment.conf.color}44`, borderRadius: 8, padding: "10px 14px", flex: 1.5 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: sentiment.conf.color }}>{sentiment.conf.label}</div>
-          <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>lang: {lang}</div>
+        <div
+          className="sentiment-card fade-in"
+          style={{
+            background: sentiment.conf.bg,
+            border: `1px solid ${sentiment.conf.color}33`,
+          }}
+          role="status"
+          aria-label={`Sentiment: ${sentiment.conf.label}`}
+        >
+          <div className="sentiment-label" style={{ color: sentiment.conf.color }}>
+            {sentiment.conf.label}
+          </div>
+          <div className="sentiment-lang">
+            lang: {lang}
+          </div>
         </div>
       )}
     </div>

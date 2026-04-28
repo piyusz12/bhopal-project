@@ -1,22 +1,45 @@
 import { useState, useRef } from "react";
 
+const LANG_CODES = {
+  English: "en-US",
+  Spanish: "es-ES",
+  French: "fr-FR",
+  German: "de-DE",
+  Hindi: "hi-IN",
+  Arabic: "ar-SA",
+  Portuguese: "pt-BR",
+  Chinese: "zh-CN",
+  Japanese: "ja-JP",
+  Korean: "ko-KR",
+  Russian: "ru-RU",
+  Italian: "it-IT",
+};
+
 export function useVoice(lang, log) {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
+
+  const getLangCode = () => LANG_CODES[lang] || "en-US";
 
   const speak = (text) => {
     const synth = window.speechSynthesis;
     if (!synth || !text) return;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang === "Hindi" ? "hi-IN" : lang === "Spanish" ? "es-ES" : "en-US";
+    utterance.lang = getLangCode();
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
     synth.cancel();
     synth.speak(utterance);
   };
 
   const toggleVoiceInput = (onTranscript) => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      log("[VOICE] Speech recognition is not available in this browser", "warning");
+      log(
+        "[VOICE] Speech recognition is not available in this browser",
+        "warning"
+      );
       return;
     }
 
@@ -26,12 +49,12 @@ export function useVoice(lang, log) {
     }
 
     const recog = new SpeechRecognition();
-    recog.lang = lang === "Hindi" ? "hi-IN" : lang === "Spanish" ? "es-ES" : "en-US";
+    recog.lang = getLangCode();
     recog.interimResults = false;
     recog.maxAlternatives = 1;
     recog.onstart = () => {
       setListening(true);
-      log("[VOICE] Listening...", "process");
+      log("[VOICE] Listening — speak now...", "process");
     };
     recog.onresult = (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript || "";
