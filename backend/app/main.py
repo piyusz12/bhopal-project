@@ -3,52 +3,32 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
-from sqlalchemy import Boolean, Column, Float, Integer, String, Text, create_engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.orm import Session
 
 from .kb import DOMAINS
 from .rag import RagEngine
 from .schemas import ChatRequest, ChatResponse, HealthResponse
 from .services import detect_language, detect_sentiment, extract_intent, maybe_call_tool, scrub_pii
+from .database import engine, Base, get_db
+from .models import ChatLog
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FAISS_DIR = BASE_DIR / "data" / "faiss"
-DB_DIR = BASE_DIR / "data" / "db"
-DB_DIR.mkdir(parents=True, exist_ok=True)
 
-engine = create_engine(f"sqlite:///{DB_DIR / 'chat_logs.db'}", future=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-Base = declarative_base()
-
-
-class ChatLog(Base):
-    __tablename__ = "chat_logs"
-
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String(120), index=True)
-    domain = Column(String(50), index=True)
-    user_message = Column(Text)
-    response = Column(Text)
-    intent = Column(String(50))
-    sentiment = Column(String(50))
-    sentiment_score = Column(Float)
-    language = Column(String(50))
-    requires_escalation = Column(Boolean)
-
-
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-APP_ORIGIN = os.getenv("APP_ORIGIN", "http://127.0.0.1:5173")
 
-app = FastAPI(title="Smart AI Support Agent API", version="1.0.0")
+app = FastAPI(title="Smart AI Support Agent API", version="1.1.0")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[],
@@ -61,6 +41,10 @@ app.add_middleware(
 rag = RagEngine(FAISS_DIR, OPENAI_API_KEY)
 rag.boot()
 
+# Singleton LLM client if API key is present
+llm_client = None
+if OPENAI_API_KEY:
+    llm_client = ChatOpenAI(model=OPENAI_MODEL, api_key=OPENAI_API_KEY, temperature=0.25)
 
 def build_prompt(domain: str, question: str, context: str, language: str, intent: str, sentiment: str, tool_events: list[str]) -> str:
     tools = "\n".join(tool_events) if tool_events else "none"
@@ -104,17 +88,17 @@ def health() -> HealthResponse:
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-def chat(payload: ChatRequest) -> ChatResponse:
+async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     domain = payload.domain if payload.domain in DOMAINS else "ecommerce"
 
     safe_message, pii_hits = scrub_pii(payload.message)
     language = detect_language(payload.message)
     sentiment, sentiment_score = detect_sentiment(payload.message)
     intent = extract_intent(payload.message)
-    tool_events = maybe_call_tool(payload.message, enabled=payload.use_tools)
+    tool_events = await maybe_call_tool(payload.message, enabled=payload.use_tools)
 
     if pii_hits:
-        blocked = {
+        parsed = {
             "sentiment": sentiment,
             "sentiment_score": round(sentiment_score, 3),
             "language": language,
@@ -127,15 +111,13 @@ def chat(payload: ChatRequest) -> ChatResponse:
                 "Please remove personal identifiers and try again."
             ),
         }
-        parsed = blocked
     else:
         retrieved_docs = rag.retrieve(domain, safe_message, k=4) if rag.available() else []
         context = "\n\n".join(d.page_content for d in retrieved_docs) or DOMAINS[domain]["knowledge"]
 
         parsed = fallback_response(domain, language, intent, sentiment, sentiment_score, context)
 
-        if OPENAI_API_KEY:
-            llm = ChatOpenAI(model=OPENAI_MODEL, api_key=OPENAI_API_KEY, temperature=0.25)
+        if llm_client:
             prompt = build_prompt(
                 domain=domain,
                 question=safe_message,
@@ -146,8 +128,15 @@ def chat(payload: ChatRequest) -> ChatResponse:
                 tool_events=tool_events,
             )
             try:
-                result = llm.invoke(prompt)
-                parsed = json.loads(result.content)
+                result = llm_client.invoke(prompt)
+                content = result.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.startswith("```"):
+                    content = content[3:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                parsed = json.loads(content.strip())
             except (json.JSONDecodeError, ValidationError, TypeError):
                 # Keep deterministic fallback if model output is malformed.
                 pass
@@ -164,21 +153,19 @@ def chat(payload: ChatRequest) -> ChatResponse:
         tool_events=tool_events,
     )
 
-    db: Session = SessionLocal()
-    db.add(
-        ChatLog(
-            session_id=payload.session_id,
-            domain=domain,
-            user_message=payload.message,
-            response=response.response,
-            intent=response.intent,
-            sentiment=response.sentiment,
-            sentiment_score=response.sentiment_score,
-            language=response.language,
-            requires_escalation=response.requires_escalation,
-        )
+    # Log to DB
+    new_log = ChatLog(
+        session_id=payload.session_id,
+        domain=domain,
+        user_message=payload.message,
+        response=response.response,
+        intent=response.intent,
+        sentiment=response.sentiment,
+        sentiment_score=response.sentiment_score,
+        language=response.language,
+        requires_escalation=response.requires_escalation,
     )
+    db.add(new_log)
     db.commit()
-    db.close()
 
     return response

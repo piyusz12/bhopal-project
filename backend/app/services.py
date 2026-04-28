@@ -1,5 +1,5 @@
 import re
-import requests
+import httpx
 from langdetect import detect, LangDetectException
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
@@ -72,26 +72,28 @@ def extract_intent(text: str) -> str:
     return "general"
 
 
-def maybe_call_tool(text: str, enabled: bool = True) -> list[str]:
+async def maybe_call_tool(text: str, enabled: bool = True) -> list[str]:
     if not enabled:
         return []
 
     tool_events: list[str] = []
-    match = re.search(r"\b(?:order|track)\s*#?(\d{1,3})\b", text.lower())
+    match = re.search(r"\b(?:order|track)\s*#?(\d+)\b", text.lower())
     if not match:
         return tool_events
 
     order_id = match.group(1)
-    try:
-        # Demo external API integration. This simulates order lookup.
-        res = requests.get(f"https://dummyjson.com/carts/{order_id}", timeout=4)
-        if res.ok:
-            payload = res.json()
-            total = payload.get("total", "N/A")
-            products = len(payload.get("products", []))
-            tool_events.append(f"tool:order_lookup success id={order_id} items={products} total={total}")
-        else:
-            tool_events.append(f"tool:order_lookup failed id={order_id} status={res.status_code}")
-    except requests.RequestException as err:
-        tool_events.append(f"tool:order_lookup error id={order_id} reason={err}")
+    async with httpx.AsyncClient() as client:
+        try:
+            # Demo external API integration. This simulates order lookup.
+            res = await client.get(f"https://dummyjson.com/carts/{order_id}", timeout=4.0)
+            if res.status_code == 200:
+                payload = res.json()
+                total = payload.get("total", "N/A")
+                products = len(payload.get("products", []))
+                tool_events.append(f"tool:order_lookup success id={order_id} items={products} total={total}")
+            else:
+                tool_events.append(f"tool:order_lookup failed id={order_id} status={res.status_code}")
+        except httpx.HTTPError as err:
+            tool_events.append(f"tool:order_lookup error id={order_id} reason={err}")
     return tool_events
+
