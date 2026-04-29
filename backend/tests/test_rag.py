@@ -4,7 +4,7 @@ from app.rag import RagEngine
 
 
 class TestRagEngine:
-    """Tests for the RAG engine (without OpenAI API key)."""
+    """Tests for the RAG engine (without Google API key)."""
 
     def test_init(self):
         engine = RagEngine(Path("/tmp/test"), None)

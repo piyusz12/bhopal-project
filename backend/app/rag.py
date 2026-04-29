@@ -2,7 +2,7 @@ from pathlib import Path
 
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .kb import DOMAINS
@@ -18,20 +18,20 @@ class RagEngine:
     - Semantic chunking with optimized parameters
     """
 
-    def __init__(self, faiss_root: Path, openai_api_key: str | None) -> None:
+    def __init__(self, faiss_root: Path, google_api_key: str | None) -> None:
         self.faiss_root = faiss_root
-        self.openai_api_key = openai_api_key
+        self.google_api_key = google_api_key
         self.vectorstores: dict[str, FAISS] = {}
 
     def available(self) -> bool:
-        return bool(self.openai_api_key)
+        return bool(self.google_api_key)
 
     def boot(self) -> None:
         """Initialize FAISS vector stores for all domains."""
         if not self.available():
             return
 
-        embeddings = OpenAIEmbeddings(api_key=self.openai_api_key)
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         # Optimized chunking: smaller chunks with higher overlap for better precision
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=350,
