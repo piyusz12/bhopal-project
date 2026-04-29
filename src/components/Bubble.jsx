@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { C, INTENT_ICONS } from "../constants";
 
 export function Bubble({ msg, accent }) {
+  const [feedback, setFeedback] = useState(null);
   const isUser = msg.role === "user";
   const isAlert = msg.isAlert;
   const isEsc = msg.isEscalation;
@@ -78,6 +79,37 @@ export function Bubble({ msg, accent }) {
                 HITL triggered
               </span>
             )}
+          </div>
+        )}
+
+        {!isUser && !isStreaming && msg.content && (
+          <div className="bubble-actions">
+            <button
+              className={`feedback-btn${feedback === "up" ? " active" : ""}`}
+              onClick={() => setFeedback(feedback === "up" ? null : "up")}
+              aria-label="Helpful response"
+              title="Helpful"
+            >
+              👍
+            </button>
+            <button
+              className={`feedback-btn${feedback === "down" ? " active" : ""}`}
+              onClick={() => setFeedback(feedback === "down" ? null : "down")}
+              aria-label="Unhelpful response"
+              title="Not helpful"
+            >
+              👎
+            </button>
+            <button
+              className="feedback-btn"
+              onClick={() => {
+                if (navigator.clipboard) navigator.clipboard.writeText(msg.content);
+              }}
+              aria-label="Copy response"
+              title="Copy"
+            >
+              📋
+            </button>
           </div>
         )}
 
