@@ -82,6 +82,7 @@ export default function App() {
           listening={listening}
           speakLastResponse={() => speak(lastAgentText)}
           lastAgentText={lastAgentText}
+          domain={domain}
         />
 
         <TelemetryPanel
