@@ -51,6 +51,7 @@ export function ChatPanel({
   speakLastResponse,
   lastAgentText,
   domain,
+  inputRef,
 }) {
   const [input, setInput] = useState("");
 
@@ -134,11 +135,12 @@ export function ChatPanel({
           </label>
           <input
             id="chat-input"
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
             disabled={loading}
-            placeholder={`Ask about ${domainData.label.toLowerCase()} support...`}
+            placeholder={`Ask about ${domainData.label.toLowerCase()} support... (Ctrl+K)`}
             className="chat-input"
             autoComplete="off"
             aria-label="Type your message"

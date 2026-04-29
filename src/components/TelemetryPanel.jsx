@@ -26,7 +26,7 @@ const FEATURE_TAGS = [
   "Rate Limiting",
 ];
 
-export function TelemetryPanel({ telemetry, telemRef, accent }) {
+export function TelemetryPanel({ telemetry, telemRef, accent, activeStage }) {
   return (
     <aside className="telemetry-panel" role="complementary" aria-label="Agent pipeline monitor">
       <div className="telemetry-header">
@@ -37,14 +37,21 @@ export function TelemetryPanel({ telemetry, telemRef, accent }) {
 
       <div className="pipeline-bar" role="img" aria-label="Processing pipeline stages">
         {PIPELINE_STAGES.map((label, i) => (
-          <div key={i} className="pipeline-node">
-            <div className="pipeline-box">
-              <div className="pipeline-label" style={{ color: accent }}>
+          <div key={i} className={`pipeline-node${activeStage === i ? " active" : ""}${activeStage > i ? " complete" : ""}`}>
+            <div className="pipeline-box" style={{ 
+              borderColor: activeStage === i ? accent : activeStage > i ? accent + "80" : undefined,
+              boxShadow: activeStage === i ? `0 0 15px ${accent}40` : undefined,
+              background: activeStage === i ? accent + "10" : undefined
+            }}>
+              <div className="pipeline-label" style={{ color: activeStage === i ? accent : activeStage > i ? accent + "cc" : undefined }}>
                 {label}
               </div>
             </div>
             {i < PIPELINE_STAGES.length - 1 && (
-              <div className="pipeline-connector" style={{ background: C.border }} />
+              <div className="pipeline-connector" style={{ 
+                background: activeStage > i ? accent : C.border,
+                opacity: activeStage > i ? 0.6 : 0.2
+              }} />
             )}
           </div>
         ))}

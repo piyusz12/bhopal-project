@@ -3,16 +3,23 @@ import "./App.css";
 import { DOMAINS } from "./constants";
 import { useChat } from "./hooks/useChat";
 import { useVoice } from "./hooks/useVoice";
+import { useQueryHistory } from "./hooks/useQueryHistory";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { Header } from "./components/Header";
 import { MetricsBar } from "./components/MetricsBar";
 import { ChatPanel } from "./components/ChatPanel";
 import { TelemetryPanel } from "./components/TelemetryPanel";
+import { QueryHistory } from "./components/QueryHistory";
+import { AnalyticsPanel } from "./components/AnalyticsPanel";
 
 export default function App() {
   const [domain, setDomain] = useState("ecommerce");
   const [telemetry, setTelemetry] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const chatRef = useRef(null);
   const telemRef = useRef(null);
+  const inputRef = useRef(null);
 
   const log = useCallback((msg, type = "info") => {
     setTelemetry((p) => [
@@ -31,10 +38,38 @@ export default function App() {
     setLang,
     metrics,
     lastAgentText,
+    activeStage,
     handleSend,
   } = useChat(domain, log);
 
   const { listening, speak, toggleVoiceInput } = useVoice(lang, log);
+
+  const {
+    history,
+    historyLoading,
+    historyError,
+    refreshHistory,
+  } = useQueryHistory("web-session");
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onToggleHistory: () => setHistoryOpen((p) => !p),
+    onFocusInput: () => {
+      inputRef.current?.focus();
+    },
+    onClosePanel: () => {
+      setHistoryOpen(false);
+      setAnalyticsOpen(false);
+    },
+    historyOpen: historyOpen || analyticsOpen,
+  });
+
+  // Refresh history whenever a new response is received
+  useEffect(() => {
+    if (!loading && messages.length > 1) {
+      refreshHistory();
+    }
+  }, [loading, messages.length]);
 
   useEffect(() => {
     setMessages([
@@ -60,12 +95,33 @@ export default function App() {
   const domainData = DOMAINS[domain];
   const accent = domainData.accent;
 
+  // Replay a saved query from history
+  const handleReplay = (queryText) => {
+    setHistoryOpen(false);
+    if (queryText && !loading) {
+      handleSend(queryText);
+    }
+  };
+
   return (
-    <div className="app-container">
-      <Header domain={domain} setDomain={setDomain} />
+    <div className={`app-container sentiment-${sentiment?.label || "neutral"}`}>
+      <Header
+        domain={domain}
+        setDomain={setDomain}
+        onHistoryToggle={() => setHistoryOpen(true)}
+        onAnalyticsToggle={() => setAnalyticsOpen(true)}
+        queryCount={history.length}
+      />
 
       <MetricsBar
-        metrics={metrics}
+        metrics={{
+          ...metrics,
+          queries: Math.max(metrics.queries, history.length),
+          escalations: Math.max(
+            metrics.escalations,
+            history.filter((h) => h.requires_escalation).length
+          ),
+        }}
         sentiment={sentiment}
         lang={lang}
         accent={accent}
@@ -83,14 +139,33 @@ export default function App() {
           speakLastResponse={() => speak(lastAgentText)}
           lastAgentText={lastAgentText}
           domain={domain}
+          inputRef={inputRef}
         />
 
         <TelemetryPanel
           telemetry={telemetry}
           telemRef={telemRef}
           accent={accent}
+          activeStage={activeStage}
         />
       </div>
+
+      <QueryHistory
+        history={history}
+        historyLoading={historyLoading}
+        historyError={historyError}
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onReplay={handleReplay}
+        accent={accent}
+      />
+
+      <AnalyticsPanel
+        history={history}
+        accent={accent}
+        isOpen={analyticsOpen}
+        onClose={() => setAnalyticsOpen(false)}
+      />
     </div>
   );
 }

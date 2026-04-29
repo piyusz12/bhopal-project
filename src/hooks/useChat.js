@@ -14,6 +14,7 @@ export function useChat(domain, log) {
     lastRouting: null,
   });
   const [lastAgentText, setLastAgentText] = useState("");
+  const [activeStage, setActiveStage] = useState(null);
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -26,8 +27,10 @@ export function useChat(domain, log) {
     setMessages((p) => [...p, { role: "user", content: query, timestamp: Date.now() }]);
 
     // ─── Telemetry simulation ───────────────────────────
+    setActiveStage(0);
     log("[INGEST] Payload received — tokenizing input stream", "info");
     await sleep(200);
+    setActiveStage(1);
     log("[SECURITY] Invoking localized NLP PII scanner (spaCy NER)...", "process");
     await sleep(300);
 
@@ -65,14 +68,19 @@ export function useChat(domain, log) {
 
     log("[SECURITY] Zero PII detected — payload cleared for processing", "success");
     await sleep(120);
+    setActiveStage(2);
     log("[ROUTER] Evaluating complexity score for multi-model routing...", "process");
     await sleep(300);
+    setActiveStage(3);
     log("[RAG] Query expansion → generating HyDE embeddings + variants...", "process");
     await sleep(350);
+    setActiveStage(4);
     log("[RAG] ANN search on HNSW index — scanning vector space...", "process");
     await sleep(350);
+    setActiveStage(5);
     log("[RAG] Cross-encoder reranking top-50 candidates → selecting top-4 chunks", "process");
     await sleep(200);
+    setActiveStage(6);
     log("[RAG] Context window assembled — injecting KB + conversation memory", "success");
     await sleep(120);
 
@@ -81,6 +89,7 @@ export function useChat(domain, log) {
 
     if (useStreaming) {
       try {
+        setActiveStage(7);
         log("[LLM] Initiating SSE stream to FastAPI backend...", "process");
 
         const res = await fetch(`${API_BASE_URL}/api/chat/stream`, {
@@ -174,6 +183,7 @@ export function useChat(domain, log) {
                   `[DONE] Response streamed | Total latency: ${latencyMs}ms`,
                   "success"
                 );
+                setActiveStage(8);
 
                 setSentiment({ label: sentVal, conf: sentConf });
                 setLang(streamMeta.language || "English");
@@ -357,6 +367,7 @@ export function useChat(domain, log) {
     metrics,
     setMetrics,
     lastAgentText,
+    activeStage,
     handleSend,
   };
 }
