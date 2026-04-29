@@ -1,8 +1,10 @@
 import re
 import math
 import httpx
-from langdetect import detect, LangDetectException
+from langdetect import detect, LangDetectException, DetectorFactory
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+DetectorFactory.seed = 0
 
 
 PII_PATTERNS = [
@@ -32,11 +34,23 @@ SENTIMENT = SentimentIntensityAnalyzer()
 
 
 def detect_language(text: str) -> str:
-    """Detect language using langdetect with graceful fallback."""
+    """Detect language with heuristics for short strings and common keywords."""
+    lower = text.lower().strip()
+    
+    # Heuristic 1: Very short strings or common English greetings
+    common_en = {"hello", "hi", "hey", "help", "thanks", "thank you", "bye", "test"}
+    if len(lower) < 5 or lower in common_en:
+        return "English"
+
+    # Heuristic 2: Only ASCII characters usually implies English in this context
+    if all(ord(c) < 128 for c in text) and len(text.split()) < 4:
+        return "English"
+
     try:
         code = detect(text)
     except LangDetectException:
         return "English"
+    
     return LANG_MAP.get(code, code)
 
 

@@ -77,18 +77,38 @@ export function ChatPanel({
           aria-label="Type your message"
         />
         <button
-          onClick={() => toggleVoiceInput((t) => setInput(t))}
+          onClick={() =>
+            toggleVoiceInput((t) => {
+              setInput(t);
+              // Auto-send after a short delay so the user sees the transcript
+              setTimeout(() => {
+                if (t.trim()) {
+                  onSend(t);
+                  setInput("");
+                }
+              }, 400);
+            })
+          }
           disabled={loading}
-          className="icon-btn"
+          className={`icon-btn${listening ? " voice-active" : ""}`}
           style={{
             background: listening ? accent + "18" : undefined,
             borderColor: listening ? accent + "50" : undefined,
             color: listening ? accent : undefined,
           }}
-          title="Voice input"
-          aria-label={listening ? "Stop voice input" : "Start voice input"}
+          title="Voice input — speak to send"
+          aria-label={listening ? "Listening… click to stop" : "Start voice input"}
         >
-          {listening ? "⏺" : "🎙"}
+          {listening ? (
+            <span className="voice-wave">
+              <span className="wave-bar" style={{ background: accent }} />
+              <span className="wave-bar" style={{ background: accent, animationDelay: "0.15s" }} />
+              <span className="wave-bar" style={{ background: accent, animationDelay: "0.3s" }} />
+              <span className="wave-bar" style={{ background: accent, animationDelay: "0.45s" }} />
+            </span>
+          ) : (
+            "🎙"
+          )}
         </button>
         <button
           onClick={speakLastResponse}
