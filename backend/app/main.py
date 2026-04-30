@@ -9,6 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -36,6 +37,8 @@ Base.metadata.create_all(bind=engine)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 app = FastAPI(
     title="NeuralSupport AI — Enterprise Customer Support Agent",
@@ -55,10 +58,14 @@ app.add_middleware(
 rag = RagEngine(FAISS_DIR, GOOGLE_API_KEY)
 rag.boot()
 
-# Singleton LLM client if API key is present
-llm_client = None
+# Initialize LLM clients
+deep_client = None
 if GOOGLE_API_KEY:
-    llm_client = ChatGoogleGenerativeAI(model=GOOGLE_MODEL, google_api_key=GOOGLE_API_KEY, temperature=0.25)
+    deep_client = ChatGoogleGenerativeAI(model=GOOGLE_MODEL, google_api_key=GOOGLE_API_KEY, temperature=0.25)
+
+fast_client = None
+if GROQ_API_KEY:
+    fast_client = ChatGroq(model=GROQ_MODEL, groq_api_key=GROQ_API_KEY, temperature=0.25)
 
 # In-memory rate limiting (sliding window)
 _rate_limit_store: dict[str, list[float]] = {}
@@ -183,7 +190,7 @@ def health() -> HealthResponse:
     ]
     return HealthResponse(
         status="ok",
-        llm_configured=bool(GOOGLE_API_KEY),
+        llm_configured=bool(GOOGLE_API_KEY or GROQ_API_KEY),
         supported_domains=list(DOMAINS.keys()),
         version="2.0.0",
         features=features,
@@ -239,7 +246,9 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
 
         parsed = fallback_response(domain, language, intent, sentiment, sentiment_score, context, routing_model)
 
-        if llm_client:
+        active_client = fast_client if routing_model == "fast" else deep_client
+
+        if active_client:
             prompt = build_prompt(
                 domain=domain,
                 question=safe_message,
@@ -253,7 +262,7 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
                 conversation_history=conversation_history,
             )
             try:
-                result = llm_client.invoke(prompt)
+                result = active_client.invoke(prompt)
                 content = result.content.strip()
                 if content.startswith("```json"):
                     content = content[7:]
@@ -362,7 +371,9 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
         context = "\n\n".join(d.page_content for d in retrieved_docs) or DOMAINS[domain]["knowledge"]
         conversation_history = _fetch_conversation_history(db, payload.session_id, limit=6)
 
-        if llm_client:
+        active_client = fast_client if routing_model == "fast" else deep_client
+
+        if active_client:
             prompt = build_prompt(
                 domain=domain,
                 question=safe_message,
@@ -378,7 +389,7 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
             try:
                 # Stream tokens from LLM
                 full_response = ""
-                async for chunk in llm_client.astream(prompt):
+                async for chunk in active_client.astream(prompt):
                     token = chunk.content
                     if token:
                         full_response += token

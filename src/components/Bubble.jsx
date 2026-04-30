@@ -4,9 +4,22 @@ import { C, INTENT_ICONS } from "../constants";
 export function Bubble({ msg, accent }) {
   const [feedback, setFeedback] = useState(null);
   const isUser = msg.role === "user";
+  const isSystem = msg.role === "system";
   const isAlert = msg.isAlert;
   const isEsc = msg.isEscalation;
   const isStreaming = msg.isStreaming;
+
+  // System messages (e.g., domain switch notices) render as a centered divider
+  if (isSystem) {
+    return (
+      <div className="bubble-container system">
+        <div className="bubble system-bubble" role="status" aria-label="System notice">
+          <span className="system-icon">🔄</span>
+          <span className="system-text">{msg.content}</span>
+        </div>
+      </div>
+    );
+  }
 
   const bubbleClass = isUser
     ? "bubble user-bubble"

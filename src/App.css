@@ -524,6 +524,39 @@ body {
   border: 1px solid rgba(30, 111, 255, 0.25);
 }
 
+/* System notice (domain switch) */
+.bubble-container.system {
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.bubble.system-bubble {
+  max-width: none;
+  background: var(--dim-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  padding: 8px 20px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.system-icon {
+  font-size: 13px;
+}
+
+.system-text {
+  opacity: 0.8;
+}
+
 .bubble-tag {
   display: flex;
   align-items: center;

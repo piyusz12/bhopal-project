@@ -20,6 +20,7 @@ export default function App() {
   const chatRef = useRef(null);
   const telemRef = useRef(null);
   const inputRef = useRef(null);
+  const isFirstRender = useRef(true);
 
   const log = useCallback((msg, type = "info") => {
     setTelemetry((p) => [
@@ -72,17 +73,34 @@ export default function App() {
   }, [loading, messages.length]);
 
   useEffect(() => {
-    setMessages([
-      {
-        role: "agent",
-        content: DOMAINS[domain].greeting,
-        timestamp: Date.now(),
-      },
-    ]);
-    setTelemetry([]);
-    setSentiment(null);
-    setLang("English");
-  }, [domain, setMessages, setSentiment, setLang]);
+    if (isFirstRender.current) {
+      // First render: show initial greeting
+      isFirstRender.current = false;
+      setMessages([
+        {
+          role: "agent",
+          content: DOMAINS[domain].greeting,
+          timestamp: Date.now(),
+        },
+      ]);
+    } else {
+      // Domain switch: preserve conversation, add a notice + new greeting
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          content: `Switched to ${DOMAINS[domain].label} domain`,
+          timestamp: Date.now(),
+        },
+        {
+          role: "agent",
+          content: DOMAINS[domain].greeting,
+          timestamp: Date.now(),
+        },
+      ]);
+      log(`[ROUTER] Domain switched to ${DOMAINS[domain].label}`, "info");
+    }
+  }, [domain]);
 
   useEffect(() => {
     chatRef.current?.scrollTo(0, chatRef.current.scrollHeight);
