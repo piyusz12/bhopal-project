@@ -25,7 +25,7 @@ graph TB
         Router[Multi-Model Router<br/>Complexity Scoring]
         QE[Query Expansion<br/>HyDE Simulation]
         RAG[Advanced RAG<br/>FAISS + Reranking]
-        LLM[LLM Synthesis<br/>OpenAI GPT-4o]
+        LLM[LLM Synthesis<br/>Google Gemini 2.5]
         Sentiment[Sentiment Engine<br/>VADER + Routing]
         Memory[Conversation Memory<br/>SQLite Episodic Store]
     end
@@ -55,7 +55,7 @@ graph TB
 |---|---|
 | **🔄 SSE Token Streaming** | Real-time word-by-word response rendering via Server-Sent Events |
 | **🧠 Advanced RAG** | Query expansion + multi-query retrieval + cross-encoder reranking |
-| **🔀 Multi-Model Routing** | Complexity-based routing between fast (Llama-3-8B) and deep (GPT-4o) models |
+| **🔀 Multi-Model Routing** | Complexity-based routing between fast (Gemini Flash) and deep (Gemini Pro) models |
 | **🔒 PII Masking** | Real-time detection & redaction of SSN, credit cards, emails, phone numbers |
 | **💬 Conversation Memory** | Episodic memory via SQLite — LLM context includes prior conversation turns |
 | **📊 Sentiment Detection** | 5-tier sentiment classification with automatic HITL escalation |
@@ -70,7 +70,7 @@ graph TB
 ### Prerequisites
 - **Node.js** 18+
 - **Python** 3.11+
-- **OpenAI API Key** (optional — works with deterministic fallback)
+- **Google API Key** (for Gemini 2.5 Flash)
 
 ### 1. Frontend Setup
 
@@ -89,8 +89,8 @@ pip install -r backend/requirements.txt
 Create `backend/.env`:
 
 ```env
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4o-mini
+GOOGLE_API_KEY=your_google_api_key
+GOOGLE_MODEL=gemini-2.5-flash
 ```
 
 ### 4. Run
@@ -217,7 +217,7 @@ python -m pytest tests/ -v --tb=short
 
 **Frontend:** React 18 · Vite 5 · Vanilla CSS (Glassmorphism) · Web Speech API  
 **Backend:** FastAPI · LangChain · FAISS · SQLAlchemy · VADER · langdetect  
-**LLM:** OpenAI GPT-4o-mini (with deterministic fallback)  
+**LLM:** Google Gemini 2.5 Flash (with deterministic fallback)  
 **Database:** SQLite (chat logs) · FAISS (vector embeddings)  
 **Testing:** Pytest · FastAPI TestClient
 

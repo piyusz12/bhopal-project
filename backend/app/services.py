@@ -106,8 +106,8 @@ def compute_routing_score(text: str, intent: str, sentiment: str) -> tuple[str, 
     Returns (model_tier, complexity_score).
 
     In a production system, this would route to different LLMs:
-    - "fast" → Llama-3-8B / Mistral-7B (simple queries)
-    - "deep" → GPT-4o (complex reasoning, escalations)
+    - "fast" → Gemini 2.5 Flash (simple queries)
+    - "deep" → Gemini 2.0 Pro (complex reasoning, escalations)
     """
     score = 0.0
 
