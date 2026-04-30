@@ -61,7 +61,8 @@ graph TB
 | **📊 Sentiment Detection** | 5-tier sentiment classification with automatic HITL escalation |
 | **🎙️ Voice I/O** | 12-language speech recognition + text-to-speech via Web Speech API |
 | **🌐 Multilingual** | Auto language detection (13 languages) with cross-lingual RAG retrieval |
-| **📈 Observability** | Real-time pipeline trace monitor + system metrics API |
+| **📈 Analytics Dashboard** | Real-time insights into intent distribution, sentiment, domain coverage, and escalations |
+| **📜 Query History** | Interactive UI drawer to review past conversations and AI confidence scores |
 | **⚡ Rate Limiting** | In-memory sliding window rate limiter (30 req/min per IP) |
 | **🏢 5 Domain Packs** | E-Commerce, Banking, Healthcare, Education, Government |
 
@@ -187,17 +188,22 @@ python -m pytest tests/ -v --tb=short
 │   ├── main.jsx                # React entry point
 │   ├── hooks/
 │   │   ├── useChat.js          # SSE streaming + standard API hook
+│   │   ├── useKeyboardShortcuts.js # Keyboard shortcuts hook
+│   │   ├── useQueryHistory.js  # Query history management hook
 │   │   └── useVoice.js         # 12-language voice I/O
 │   └── components/
-│       ├── Header.jsx          # Brand + domain selector + status
-│       ├── MetricsBar.jsx      # Real-time metrics dashboard
-│       ├── MetCard.jsx         # Glass metric card
-│       ├── ChatPanel.jsx       # Chat interface with streaming
+│       ├── AnalyticsPanel.jsx  # Detailed metrics and charts
 │       ├── Bubble.jsx          # Message bubble with metadata
-│       ├── TelemetryPanel.jsx  # Pipeline monitor + feature tags
-│       └── LogLine.jsx         # Telemetry log entry
+│       ├── ChatPanel.jsx       # Chat interface with streaming
+│       ├── Header.jsx          # Brand + domain selector + status
+│       ├── LogLine.jsx         # Telemetry log entry
+│       ├── MetCard.jsx         # Glass metric card
+│       ├── MetricsBar.jsx      # Real-time metrics dashboard
+│       ├── QueryHistory.jsx    # User conversation history display
+│       └── TelemetryPanel.jsx  # Pipeline monitor + feature tags
 ├── backend/
 │   ├── app/
+│   │   ├── __init__.py         # Package initialization
 │   │   ├── main.py             # FastAPI app (SSE, history, metrics, rate limiting)
 │   │   ├── rag.py              # Advanced RAG (multi-query, reranking)
 │   │   ├── services.py         # PII, sentiment, intent, routing, expansion
