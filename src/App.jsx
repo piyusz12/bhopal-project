@@ -17,6 +17,7 @@ export default function App() {
   const [telemetry, setTelemetry] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [telemetryOpen, setTelemetryOpen] = useState(true);
   const chatRef = useRef(null);
   const telemRef = useRef(null);
   const inputRef = useRef(null);
@@ -145,7 +146,7 @@ export default function App() {
         accent={accent}
       />
 
-      <div className="main-split">
+      <div className={`main-split${telemetryOpen ? '' : ' telemetry-collapsed'}`}>
         <ChatPanel
           messages={messages}
           loading={loading}
@@ -165,6 +166,8 @@ export default function App() {
           telemRef={telemRef}
           accent={accent}
           activeStage={activeStage}
+          isOpen={telemetryOpen}
+          onToggle={() => setTelemetryOpen(p => !p)}
         />
       </div>
 

@@ -406,6 +406,93 @@ body {
   overflow: hidden;
   position: relative;
   z-index: 1;
+  transition: grid-template-columns 0.4s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.main-split.telemetry-collapsed {
+  grid-template-columns: 1fr 48px;
+}
+
+/* ─── Telemetry Sidebar Toggle ─────────────────────────── */
+.telemetry-toggle-tab {
+  position: absolute;
+  top: 12px;
+  left: -1px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 6px;
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  transition: all var(--transition-smooth);
+  transform: translateX(-100%);
+}
+
+.telemetry-toggle-tab:hover {
+  background: var(--dim-glass);
+  border-color: var(--border-light);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
+}
+
+.telemetry-toggle-icon {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--teal);
+  transition: transform 0.3s ease;
+}
+
+/* When collapsed, show toggle inside the panel area instead */
+.telemetry-panel--collapsed .telemetry-toggle-tab {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 16px 8px;
+  border: none;
+  border-radius: 0;
+  border-left: 1px solid var(--glass-border);
+  background: rgba(4, 7, 13, 0.9);
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.telemetry-toggle-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color var(--transition-smooth);
+}
+
+.telemetry-panel--collapsed .telemetry-toggle-tab:hover .telemetry-toggle-label {
+  color: var(--teal);
+}
+
+/* When expanded, show the tab on the left edge of the panel */
+.telemetry-panel:not(.telemetry-panel--collapsed) .telemetry-toggle-tab {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  transform: translateX(-100%);
+  border-right: none;
 }
 
 /* ─── Chat Panel ────────────────────────────────────────── */
@@ -1165,6 +1252,25 @@ button:disabled {
   .main-split {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
+  }
+
+  .main-split.telemetry-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 48px;
+  }
+
+  .telemetry-panel--collapsed .telemetry-toggle-tab {
+    flex-direction: row;
+    height: auto;
+    width: 100%;
+    padding: 10px 16px;
+    border-left: none;
+    border-top: 1px solid var(--glass-border);
+  }
+
+  .telemetry-panel--collapsed .telemetry-toggle-label {
+    writing-mode: horizontal-tb;
+    text-orientation: initial;
   }
 
   .chat-panel {
