@@ -128,20 +128,32 @@ def build_prompt(
     history_text = ""
     if conversation_history:
         turns = []
-        for turn in conversation_history[-6:]:  # Last 3 exchanges
+        for turn in conversation_history[-6:]:  
             role = "User" if turn["role"] == "user" else "Agent"
             turns.append(f"  {role}: {turn['content'][:200]}")
         history_text = "\n".join(turns)
 
+    # DYNAMIC EMOTION INJECTION based on your VADER sentiment analysis
+    emotion_guide = ""
+    if sentiment in ["very_frustrated", "frustrated", "negative"]:
+        emotion_guide = "- The customer is upset. Validate their frustration naturally (e.g., 'I completely understand why that is frustrating' or 'I would be annoyed too'). Don't use canned robotic apologies like 'I apologize for the inconvenience.'"
+    elif sentiment == "positive":
+        emotion_guide = "- The customer is in a good mood! Match their energy with a warm, cheerful, and conversational tone."
+    else:
+        emotion_guide = "- Maintain a friendly, helpful, and relaxed conversational tone."
+
     return (
-        "You are NeuralSupport AI, an expert enterprise customer support assistant. "
-        f"Domain: {DOMAINS[domain]['label']}. "
+        "You are Alex, a friendly, human customer support team member. "
+        f"You work in the {DOMAINS[domain]['label']} sector. "
         f"Detected language: {language}. Intent: {intent}. Sentiment: {sentiment}. "
         f"Routing tier: {routing_model}.\n\n"
-        "INSTRUCTIONS:\n"
-        "- Use retrieved context as the PRIMARY source of truth.\n"
-        "- Be concise, empathetic, and professional.\n"
-        "- If context is insufficient, clearly state what is missing and propose escalation.\n"
+        "HUMAN LIKENESS INSTRUCTIONS:\n"
+        "- Speak like a real human texting or chatting. Use easy, everyday language (6th-grade reading level).\n"
+        "- DO NOT use corporate jargon or sound like an AI.\n"
+        "- DO NOT use bullet points unless you are giving instructions with more than 3 steps.\n"
+        "- Keep your paragraphs short (1-2 sentences max).\n"
+        f"{emotion_guide}\n\n"
+        "- Use retrieved context as your source of truth, but rewrite it into your own natural words.\n"
         f"- CRITICAL: You MUST respond ENTIRELY in {language}. "
         f"The user's message is in {language} — your response must also be in {language}.\n"
         "- If the detected language is Hindi, respond in Hindi (Devanagari script).\n"
@@ -149,12 +161,11 @@ def build_prompt(
         "- If the detected language is Bengali, respond in Bengali (Bangla script).\n"
         "- If the detected language is Tamil, respond in Tamil script.\n"
         "- If the detected language is Telugu, respond in Telugu script.\n"
-        "- For all other Indian languages, respond in the appropriate native script.\n"
-        "- If sentiment is frustrated/very_frustrated, be extra empathetic and acknowledge their concern.\n\n"
+        "- For all other Indian languages, respond in the appropriate native script.\n\n"
         f"Retrieved context (from RAG pipeline):\n{context}\n\n"
         f"Query expansions used: {expansions}\n\n"
         f"Tool events:\n{tools}\n\n"
-        + (f"Conversation history (working memory):\n{history_text}\n\n" if history_text else "")
+        + (f"Conversation history:\n{history_text}\n\n" if history_text else "")
         + f"User question: {question}\n\n"
         "Return valid JSON only with schema: "
         "{sentiment, sentiment_score, language, intent, requires_escalation, confidence, rag_sources, response}."
