@@ -18,13 +18,13 @@ export function useChat(domain, log) {
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const handleSend = async (input) => {
-    if (!input.trim() || loading) return;
+  const handleSend = async (input, imageBase64 = null) => {
+    if (!input.trim() && !imageBase64 || loading) return;
     const query = input.trim();
     setLoading(true);
     const t0 = Date.now();
 
-    setMessages((p) => [...p, { role: "user", content: query, timestamp: Date.now() }]);
+    setMessages((p) => [...p, { role: "user", content: query, image: imageBase64, timestamp: Date.now() }]);
 
     // ─── Telemetry simulation (Bhashini + RAG Pipeline) ───
     setActiveStage(0);
@@ -115,6 +115,7 @@ export function useChat(domain, log) {
             domain,
             session_id: "web-session",
             use_tools: true,
+            image_base64: imageBase64,
           }),
         });
 
@@ -275,6 +276,7 @@ export function useChat(domain, log) {
           domain,
           session_id: "web-session",
           use_tools: true,
+          image_base64: imageBase64,
         }),
       });
 

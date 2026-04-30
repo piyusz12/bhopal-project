@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { C, DOMAINS } from "../constants";
 import { Bubble } from "./Bubble";
 
@@ -54,6 +54,8 @@ export function ChatPanel({
   inputRef,
 }) {
   const [input, setInput] = useState("");
+  const [imageBase64, setImageBase64] = useState(null);
+  const fileInputRef = useRef(null);
 
   const accent = domainData.accent;
   const suggestions = SUGGESTION_MAP[domain] || SUGGESTION_MAP.ecommerce;
@@ -63,10 +65,24 @@ export function ChatPanel({
   }, [messages.length, loading]);
 
   const handleSend = () => {
-    if (input.trim()) {
-      onSend(input);
+    if (input.trim() || imageBase64) {
+      onSend(input, imageBase64);
       setInput("");
+      setImageBase64(null);
     }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImageBase64(reader.result.split(",")[1]); // Store only the base64 part
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset file input so same file can be selected again if needed
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSuggestion = (text) => {
@@ -129,7 +145,38 @@ export function ChatPanel({
       </div>
 
       <div className="input-area">
+        {imageBase64 && (
+          <div className="image-preview-container">
+            <img src={`data:image/jpeg;base64,${imageBase64}`} alt="Upload preview" className="image-preview-thumb" />
+            <button className="image-preview-remove" onClick={() => setImageBase64(null)} aria-label="Remove image">
+              ✕
+            </button>
+          </div>
+        )}
         <div className="input-wrapper">
+          <input
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            ref={fileInputRef}
+            onChange={handleFileChange}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            className="icon-btn"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: C.muted,
+              minWidth: 36,
+              padding: "8px",
+            }}
+            title="Upload image"
+            aria-label="Upload image"
+          >
+            📷
+          </button>
           <label htmlFor="chat-input" className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>
             Type your message
           </label>
@@ -199,12 +246,12 @@ export function ChatPanel({
         </button>
         <button
           onClick={handleSend}
-          disabled={loading || !input.trim()}
+          disabled={loading || (!input.trim() && !imageBase64)}
           className="primary-btn"
           style={{
-            background: !loading && input.trim() ? accent + "18" : undefined,
-            borderColor: !loading && input.trim() ? accent + "50" : undefined,
-            color: !loading && input.trim() ? accent : undefined,
+            background: !loading && (input.trim() || imageBase64) ? accent + "18" : undefined,
+            borderColor: !loading && (input.trim() || imageBase64) ? accent + "50" : undefined,
+            color: !loading && (input.trim() || imageBase64) ? accent : undefined,
           }}
           aria-label="Send message"
         >

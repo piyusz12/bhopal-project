@@ -7,6 +7,7 @@ class ChatRequest(BaseModel):
     domain: str = Field(default="ecommerce")
     session_id: str = Field(default="default-session")
     use_tools: bool = Field(default=True)
+    image_base64: str | None = None
 
 
 class ChatResponse(BaseModel):

@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from pydantic import ValidationError
@@ -67,6 +68,27 @@ if GOOGLE_API_KEY:
 fast_client = None
 if GROQ_API_KEY:
     fast_client = ChatGroq(model=GROQ_MODEL, groq_api_key=GROQ_API_KEY, temperature=0.25)
+
+# Optional Servam AI override: if SERVAM_API_KEY is set, use Servam for both fast/deep tiers.
+SERVAM_API_KEY = os.getenv("SERVAM_API_KEY")
+SERVAM_MODEL = os.getenv("SERVAM_MODEL", "servam-default")
+SERVAM_URL = os.getenv("SERVAM_URL", "https://api.servam.ai/v1/chat/completions")
+servam_client = None
+if SERVAM_API_KEY:
+    try:
+        from .servam import ServamClient
+
+        servam_client = ServamClient(
+            model=SERVAM_MODEL,
+            servam_api_key=SERVAM_API_KEY,
+            servam_url=SERVAM_URL,
+            temperature=0.25,
+        )
+        # override existing clients so the orchestration uses Servam when provided
+        deep_client = servam_client
+        fast_client = servam_client
+    except Exception:
+        servam_client = None
 
 # In-memory rate limiting (sliding window)
 _rate_limit_store: dict[str, list[float]] = {}
@@ -147,13 +169,10 @@ def build_prompt(
         f"You work in the {DOMAINS[domain]['label']} sector. "
         f"Detected language: {language}. Intent: {intent}. Sentiment: {sentiment}. "
         f"Routing tier: {routing_model}.\n\n"
-        "HUMAN LIKENESS INSTRUCTIONS:\n"
-        "- Speak like a real human texting or chatting. Use easy, everyday language (6th-grade reading level).\n"
-        "- DO NOT use corporate jargon or sound like an AI.\n"
-        "- DO NOT use bullet points unless you are giving instructions with more than 3 steps.\n"
-        "- Keep your paragraphs short (1-2 sentences max).\n"
-        f"{emotion_guide}\n\n"
-        "- Use retrieved context as your source of truth, but rewrite it into your own natural words.\n"
+        "INSTRUCTIONS:\n"
+        "- Use retrieved context as the PRIMARY source of truth.\n"
+        "- Be concise, empathetic, and professional.\n"
+        "- If context is insufficient, clearly state what is missing and propose escalation.\n"
         f"- CRITICAL: You MUST respond ENTIRELY in {language}. "
         f"The user's message is in {language} — your response must also be in {language}.\n"
         "- If the detected language is Hindi, respond in Hindi (Devanagari script).\n"
@@ -246,6 +265,9 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
     sentiment, sentiment_score = detect_sentiment(payload.message)
     intent = extract_intent(payload.message)
     routing_model, complexity_score = compute_routing_score(payload.message, intent, sentiment)
+    if payload.image_base64:
+        routing_model = "deep"  # Force deep model for vision capabilities
+    
     tool_events = await maybe_call_tool(payload.message, enabled=payload.use_tools)
 
     # Bhashini NER — extract entities (pincode, aadhaar, phone, amounts, etc.)
@@ -288,7 +310,7 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
         active_client = fast_client if routing_model == "fast" else deep_client
 
         if active_client:
-            prompt = build_prompt(
+            prompt_str = build_prompt(
                 domain=domain,
                 question=safe_message,
                 context=context,
@@ -300,8 +322,20 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
                 query_expansions=query_expansions,
                 conversation_history=conversation_history,
             )
+            
+            if payload.image_base64:
+                messages = [
+                    SystemMessage(content=prompt_str),
+                    HumanMessage(content=[
+                        {"type": "text", "text": "Please analyze this image along with the user's question to diagnose the issue."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{payload.image_base64}"}}
+                    ])
+                ]
+            else:
+                messages = prompt_str
+                
             try:
-                result = active_client.invoke(prompt)
+                result = active_client.invoke(messages)
                 content = result.content.strip()
                 if content.startswith("```json"):
                     content = content[7:]
@@ -316,11 +350,11 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
 
     response = ChatResponse(
         sentiment=parsed.get("sentiment", sentiment),
-        sentiment_score=float(parsed.get("sentiment_score", sentiment_score)),
+        sentiment_score=float(parsed.get("sentiment_score") if parsed.get("sentiment_score") is not None else sentiment_score),
         language=parsed.get("language", language),
         intent=parsed.get("intent", intent),
         requires_escalation=bool(parsed.get("requires_escalation", False)),
-        confidence=float(parsed.get("confidence", 0.7)),
+        confidence=float(parsed.get("confidence") if parsed.get("confidence") is not None else 0.7),
         rag_sources=list(parsed.get("rag_sources", [])),
         response=parsed.get("response", "I could not generate a response."),
         tool_events=tool_events,
@@ -370,6 +404,9 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
     sentiment, sentiment_score = detect_sentiment(payload.message)
     intent = extract_intent(payload.message)
     routing_model, complexity_score = compute_routing_score(payload.message, intent, sentiment)
+    if payload.image_base64:
+        routing_model = "deep"  # Force deep model for vision capabilities
+    
     tool_events = await maybe_call_tool(payload.message, enabled=payload.use_tools)
     query_expansions = []
 
@@ -423,7 +460,7 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
         active_client = fast_client if routing_model == "fast" else deep_client
 
         if active_client:
-            prompt = build_prompt(
+            prompt_str = build_prompt(
                 domain=domain,
                 question=safe_message,
                 context=context,
@@ -435,10 +472,22 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
                 query_expansions=query_expansions,
                 conversation_history=conversation_history,
             )
+
+            if payload.image_base64:
+                messages = [
+                    SystemMessage(content=prompt_str),
+                    HumanMessage(content=[
+                        {"type": "text", "text": "Please analyze this image along with the user's question to diagnose the issue."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{payload.image_base64}"}}
+                    ])
+                ]
+            else:
+                messages = prompt_str
+
             try:
                 # Stream tokens from LLM
                 full_response = ""
-                async for chunk in active_client.astream(prompt):
+                async for chunk in active_client.astream(messages):
                     token = chunk.content
                     if token:
                         full_response += token

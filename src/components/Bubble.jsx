@@ -62,6 +62,11 @@ export function Bubble({ msg, accent }) {
         )}
 
         <span className="bubble-content">
+          {msg.image && (
+            <div className="bubble-image-container">
+              <img src={`data:image/jpeg;base64,${msg.image}`} alt="Uploaded diagnostic" className="bubble-image" />
+            </div>
+          )}
           {msg.content}
           {isStreaming && <span className="streaming-cursor" aria-hidden="true" />}
         </span>
