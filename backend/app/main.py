@@ -5,9 +5,10 @@ from collections import Counter
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+import base64
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
@@ -63,11 +64,25 @@ rag.boot()
 # Initialize LLM clients
 deep_client = None
 if GOOGLE_API_KEY:
-    deep_client = ChatGoogleGenerativeAI(model=GOOGLE_MODEL, google_api_key=GOOGLE_API_KEY, temperature=0.25)
+    deep_client = ChatGoogleGenerativeAI(
+        model=GOOGLE_MODEL,
+        google_api_key=GOOGLE_API_KEY,
+        temperature=0.8,
+        top_p=0.9,
+        presence_penalty=0.4,
+        frequency_penalty=0.4,
+    )
 
 fast_client = None
 if GROQ_API_KEY:
-    fast_client = ChatGroq(model=GROQ_MODEL, groq_api_key=GROQ_API_KEY, temperature=0.25)
+    fast_client = ChatGroq(
+        model=GROQ_MODEL,
+        groq_api_key=GROQ_API_KEY,
+        temperature=0.8,
+        top_p=0.9,
+        presence_penalty=0.4,
+        frequency_penalty=0.4,
+    )
 
 # Optional Servam AI override: if SERVAM_API_KEY is set, use Servam for both fast/deep tiers.
 SERVAM_API_KEY = os.getenv("SERVAM_API_KEY")
@@ -165,14 +180,22 @@ def build_prompt(
         emotion_guide = "- Maintain a friendly, helpful, and relaxed conversational tone."
 
     return (
-        "You are Alex, a friendly, human customer support team member. "
+        "You are Alex, a friendly customer support team member. "
         f"You work in the {DOMAINS[domain]['label']} sector. "
         f"Detected language: {language}. Intent: {intent}. Sentiment: {sentiment}. "
         f"Routing tier: {routing_model}.\n\n"
-        "INSTRUCTIONS:\n"
-        "- Use retrieved context as the PRIMARY source of truth.\n"
-        "- Be concise, empathetic, and professional.\n"
-        "- If context is insufficient, clearly state what is missing and propose escalation.\n"
+        "HUMAN LIKENESS INSTRUCTIONS:\n"
+        "- Speak conversationally. Use contractions (I'm, you're, won't).\n"
+        "- Vary your sentence length. Short sentences are punchy. Longer ones explain complex ideas.\n"
+        "- Don't use classic 'AI words' like: delve, testament, tapestry, crucial, or underscore.\n"
+        "- Be direct. Don't use overly polite filler like 'I would be happy to help with that.' Just answer the question.\n"
+        "- It is okay to start sentences with 'And', 'But', or 'So'.\n"
+        "- Never pretend to be human, have feelings, or possess a physical body, but use a warm, human tone.\n"
+        "- Use easy, everyday language (6th-grade reading level).\n"
+        "- DO NOT use bullet points unless you are giving instructions with more than 3 steps.\n"
+        "- Keep your paragraphs short (1-2 sentences max).\n"
+        f"{emotion_guide}\n\n"
+        "- Use retrieved context as your source of truth, but rewrite it into your own natural words.\n"
         f"- CRITICAL: You MUST respond ENTIRELY in {language}. "
         f"The user's message is in {language} — your response must also be in {language}.\n"
         "- If the detected language is Hindi, respond in Hindi (Devanagari script).\n"
@@ -249,6 +272,55 @@ def bhashini_status():
     return get_bhashini_status()
 
 
+@app.post("/api/ekyc/upload")
+async def verify_uploaded_id(file: UploadFile = File(...)):
+    """Receives an uploaded ID image and uses Gemini to extract eKYC data."""
+    try:
+        file_bytes = await file.read()
+        base64_image = base64.b64encode(file_bytes).decode('utf-8')
+        
+        system_prompt = """
+        You are a highly secure Indian eKYC extraction tool. Analyze this image.
+        1. Identify if it is an Aadhar Card, PAN Card, Driving License, or Voter ID.
+        2. Extract the Full Name and the ID Number.
+        3. If it is an Aadhar card, MASK the first 8 digits for privacy (e.g., XXXX-XXXX-1234).
+        
+        Return ONLY a strict JSON object with NO markdown formatting, using these exact keys:
+        {
+            "documentType": "...",
+            "name": "...",
+            "idNumber": "...",
+            "status": "Verified ✅"
+        }
+        If the image is not a valid ID, blurry, or unreadable, return a JSON object where status is "Error: Invalid ID".
+        """
+
+        if not deep_client:
+             raise HTTPException(status_code=503, detail="Gemini model not configured")
+
+        message = HumanMessage(content=[
+            {"type": "text", "text": system_prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{file.content_type};base64,{base64_image}"}}
+        ])
+        
+        response = deep_client.invoke([message])
+        raw_output = response.content
+        
+        # Clean output
+        clean_output = raw_output.strip()
+        if clean_output.startswith("```json"):
+            clean_output = clean_output[7:]
+        if clean_output.startswith("```"):
+            clean_output = clean_output[3:]
+        if clean_output.endswith("```"):
+            clean_output = clean_output[:-3]
+        
+        return json.loads(clean_output.strip())
+    except Exception as e:
+        print(f"eKYC Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process document")
+
+
 # ─── Chat (standard request/response) ───────────────────────
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get_db)) -> ChatResponse:
@@ -261,17 +333,22 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
     t0 = time.time()
 
     safe_message, pii_hits = scrub_pii(payload.message)
-    language = detect_language(payload.message)
-    sentiment, sentiment_score = detect_sentiment(payload.message)
-    intent = extract_intent(payload.message)
-    routing_model, complexity_score = compute_routing_score(payload.message, intent, sentiment)
+    
+    # Handle empty messages with images
+    if not safe_message.strip() and payload.image_base64:
+        safe_message = "[Analyzed Image]"
+        
+    language = detect_language(safe_message)
+    sentiment, sentiment_score = detect_sentiment(safe_message)
+    intent = extract_intent(safe_message)
+    routing_model, complexity_score = compute_routing_score(safe_message, intent, sentiment)
     if payload.image_base64:
         routing_model = "deep"  # Force deep model for vision capabilities
     
-    tool_events = await maybe_call_tool(payload.message, enabled=payload.use_tools)
+    tool_events = await maybe_call_tool(safe_message, enabled=payload.use_tools)
 
     # Bhashini NER — extract entities (pincode, aadhaar, phone, amounts, etc.)
-    ner_entities = extract_entities(payload.message)
+    ner_entities = extract_entities(safe_message)
     bhashini_services = ["NER", "TLD"]
     if bhashini_configured():
         bhashini_services.extend(["NMT", "ASR", "TTS", "Denoiser", "Transliteration"])
@@ -324,10 +401,20 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
             )
             
             if payload.image_base64:
+                # For vision tasks, it's often better to put instructions in the human message turn
+                vision_prompt = (
+                    f"SYSTEM INSTRUCTIONS:\n{prompt_str}\n\n"
+                    f"USER QUESTION: {safe_message if safe_message.strip() else 'Please analyze this image and diagnose any issues.'}\n\n"
+                    "VISUAL ANALYSIS TASK:\n"
+                    "1. Identify the product/device in the image.\n"
+                    "2. Look for any visible defects, physical damage, or wear.\n"
+                    "3. Detect and transcribe any error messages, status lights, or UI warnings.\n"
+                    "4. Based on the retrieved context and this image, provide a precise diagnosis and solution.\n\n"
+                    "Return only valid JSON with the requested schema."
+                )
                 messages = [
-                    SystemMessage(content=prompt_str),
                     HumanMessage(content=[
-                        {"type": "text", "text": "Please analyze this image along with the user's question to diagnose the issue."},
+                        {"type": "text", "text": vision_prompt},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{payload.image_base64}"}}
                     ])
                 ]
@@ -368,7 +455,7 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
     new_log = ChatLog(
         session_id=payload.session_id,
         domain=domain,
-        user_message=payload.message,
+        user_message=payload.message or "[Image]",
         response=response.response,
         intent=response.intent,
         sentiment=response.sentiment,
@@ -400,18 +487,21 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
     domain = payload.domain if payload.domain in DOMAINS else "ecommerce"
 
     safe_message, pii_hits = scrub_pii(payload.message)
-    language = detect_language(payload.message)
-    sentiment, sentiment_score = detect_sentiment(payload.message)
-    intent = extract_intent(payload.message)
-    routing_model, complexity_score = compute_routing_score(payload.message, intent, sentiment)
+    if not safe_message.strip() and payload.image_base64:
+        safe_message = "[Analyzed Image]"
+        
+    language = detect_language(safe_message)
+    sentiment, sentiment_score = detect_sentiment(safe_message)
+    intent = extract_intent(safe_message)
+    routing_model, complexity_score = compute_routing_score(safe_message, intent, sentiment)
     if payload.image_base64:
         routing_model = "deep"  # Force deep model for vision capabilities
     
-    tool_events = await maybe_call_tool(payload.message, enabled=payload.use_tools)
+    tool_events = await maybe_call_tool(safe_message, enabled=payload.use_tools)
     query_expansions = []
 
     # Bhashini NER — extract entities
-    ner_entities = extract_entities(payload.message)
+    ner_entities = extract_entities(safe_message)
     bhashini_services = ["NER", "TLD"]
     if bhashini_configured():
         bhashini_services.extend(["NMT", "ASR", "TTS", "Denoiser", "Transliteration"])
@@ -474,10 +564,19 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
             )
 
             if payload.image_base64:
+                vision_prompt = (
+                    f"SYSTEM INSTRUCTIONS:\n{prompt_str}\n\n"
+                    f"USER QUESTION: {safe_message if safe_message != '[Analyzed Image]' else 'Please analyze this image and diagnose any issues.'}\n\n"
+                    "VISUAL ANALYSIS TASK:\n"
+                    "1. Identify the product/device in the image.\n"
+                    "2. Look for any visible defects, physical damage, or wear.\n"
+                    "3. Detect and transcribe any error messages, status lights, or UI warnings.\n"
+                    "4. Based on the retrieved context and this image, provide a precise diagnosis and solution.\n\n"
+                    "Return only valid JSON with the requested schema."
+                )
                 messages = [
-                    SystemMessage(content=prompt_str),
                     HumanMessage(content=[
-                        {"type": "text", "text": "Please analyze this image along with the user's question to diagnose the issue."},
+                        {"type": "text", "text": vision_prompt},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{payload.image_base64}"}}
                     ])
                 ]
@@ -518,7 +617,7 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
                 # Log to DB
                 new_log = ChatLog(
                     session_id=payload.session_id, domain=domain,
-                    user_message=payload.message,
+                    user_message=payload.message or "[Image]",
                     response=parsed.get("response", full_response) if 'parsed' in dir() else full_response,
                     intent=intent, sentiment=sentiment, sentiment_score=sentiment_score,
                     language=language, requires_escalation=False,
@@ -543,7 +642,7 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
         # Log to DB
         new_log = ChatLog(
             session_id=payload.session_id, domain=domain,
-            user_message=payload.message, response=response_text,
+            user_message=payload.message or "[Image]", response=response_text,
             intent=intent, sentiment=sentiment, sentiment_score=sentiment_score,
             language=language, requires_escalation=fb["requires_escalation"],
             confidence=fb["confidence"], routing_model=routing_model,

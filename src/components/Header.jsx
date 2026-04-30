@@ -6,6 +6,7 @@ export function Header({
   setDomain,
   onHistoryToggle,
   onAnalyticsToggle,
+  onScannerToggle,
   queryCount,
 }) {
   const accent = DOMAINS[domain].accent;
@@ -52,6 +53,18 @@ export function Header({
       </nav>
 
       <div className="header-actions">
+        {/* Scan ID button */}
+        <button
+          className="history-toggle-btn"
+          onClick={onScannerToggle}
+          aria-label="Scan Document for eKYC"
+          title="Scan ID Document"
+          style={{ borderColor: "#3b82f640" }}
+        >
+          <span className="history-icon">🪪</span>
+          <span className="history-label" style={{ color: "#60a5fa" }}>Scan ID</span>
+        </button>
+
         {/* Analytics button */}
         <button
           className="history-toggle-btn"

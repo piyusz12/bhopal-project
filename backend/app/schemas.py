@@ -1,13 +1,18 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, Field, model_validator
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1)
+    message: str = Field(default="")
     domain: str = Field(default="ecommerce")
     session_id: str = Field(default="default-session")
     use_tools: bool = Field(default=True)
     image_base64: str | None = None
+
+    @model_validator(mode="after")
+    def validate_content(self) -> "ChatRequest":
+        if not self.message.strip() and not self.image_base64:
+            raise ValueError("Either 'message' or 'image_base64' must be provided.")
+        return self
 
 
 class ChatResponse(BaseModel):

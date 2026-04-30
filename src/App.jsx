@@ -11,6 +11,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { TelemetryPanel } from "./components/TelemetryPanel";
 import { QueryHistory } from "./components/QueryHistory";
 import { AnalyticsPanel } from "./components/AnalyticsPanel";
+import DocumentScanner from "./components/DocumentScanner";
 
 export default function App() {
   const [domain, setDomain] = useState("ecommerce");
@@ -18,6 +19,7 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [telemetryOpen, setTelemetryOpen] = useState(true);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState("auto");
   const chatRef = useRef(null);
   const telemRef = useRef(null);
@@ -141,6 +143,7 @@ export default function App() {
         setDomain={setDomain}
         onHistoryToggle={() => setHistoryOpen(true)}
         onAnalyticsToggle={() => setAnalyticsOpen(true)}
+        onScannerToggle={() => setScannerOpen(true)}
         queryCount={history.length}
       />
 
@@ -201,6 +204,10 @@ export default function App() {
         isOpen={analyticsOpen}
         onClose={() => setAnalyticsOpen(false)}
       />
+
+      {scannerOpen && (
+        <DocumentScanner onClose={() => setScannerOpen(false)} />
+      )}
     </div>
   );
 }

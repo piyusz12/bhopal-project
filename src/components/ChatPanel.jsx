@@ -60,6 +60,12 @@ export function ChatPanel({
   const accent = domainData.accent;
   const suggestions = SUGGESTION_MAP[domain] || SUGGESTION_MAP.ecommerce;
 
+  const handleMakeSuggestion = () => {
+    const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
+    setInput(randomSuggestion);
+    inputRef.current?.focus();
+  };
+
   const showSuggestions = useMemo(() => {
     return messages.length <= 1 && !loading;
   }, [messages.length, loading]);
@@ -177,6 +183,22 @@ export function ChatPanel({
           >
             📷
           </button>
+          <button
+            onClick={handleMakeSuggestion}
+            disabled={loading}
+            className="icon-btn"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: C.muted,
+              minWidth: 36,
+              padding: "8px",
+            }}
+            title="Get a suggestion"
+            aria-label="Get a suggestion"
+          >
+            💡
+          </button>
           <label htmlFor="chat-input" className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>
             Type your message
           </label>
@@ -209,9 +231,8 @@ export function ChatPanel({
             className={`icon-btn${listening ? " voice-active" : ""}`}
             style={{
               background: listening ? accent + "18" : "transparent",
-              borderColor: listening ? accent + "50" : "transparent",
+              border: listening ? `1px solid ${accent}50` : "none",
               color: listening ? accent : undefined,
-              border: "none",
               minWidth: 36,
               padding: "8px",
             }}
@@ -236,7 +257,7 @@ export function ChatPanel({
           className="icon-btn"
           style={{
             background: lastAgentText && !loading ? C.blue + "15" : undefined,
-            borderColor: lastAgentText && !loading ? C.blue + "50" : undefined,
+            border: lastAgentText && !loading ? `1px solid ${C.blue}50` : undefined,
             color: lastAgentText && !loading ? C.blue : undefined,
           }}
           title="Read latest response"
@@ -250,7 +271,7 @@ export function ChatPanel({
           className="primary-btn"
           style={{
             background: !loading && (input.trim() || imageBase64) ? accent + "18" : undefined,
-            borderColor: !loading && (input.trim() || imageBase64) ? accent + "50" : undefined,
+            border: !loading && (input.trim() || imageBase64) ? `1px solid ${accent}50` : undefined,
             color: !loading && (input.trim() || imageBase64) ? accent : undefined,
           }}
           aria-label="Send message"
