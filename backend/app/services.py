@@ -15,11 +15,22 @@ PII_PATTERNS = [
 ]
 
 LANG_MAP = {
+    # ─── Top 10 Indian Languages ───────────────────────────
+    "hi": "Hindi",
+    "mr": "Marathi",
+    "bn": "Bengali",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "kn": "Kannada",
+    "gu": "Gujarati",
+    "ml": "Malayalam",
+    "pa": "Punjabi",
+    "or": "Odia",
+    # ─── International Languages ───────────────────────────
     "en": "English",
     "es": "Spanish",
     "fr": "French",
     "de": "German",
-    "hi": "Hindi",
     "ar": "Arabic",
     "pt": "Portuguese",
     "zh-cn": "Chinese",
@@ -28,29 +39,117 @@ LANG_MAP = {
     "ko": "Korean",
     "ru": "Russian",
     "it": "Italian",
+    "ur": "Urdu",
+    "ne": "Nepali",
+    "si": "Sinhala",
+    "as": "Assamese",
+}
+
+# ─── Script-based detection using Unicode ranges ──────────
+# These catch cases where langdetect may misidentify Indian languages
+_SCRIPT_RANGES = [
+    # (start, end, language)
+    (0x0900, 0x097F, "Hindi"),       # Devanagari (Hindi, Marathi, Sanskrit, Nepali)
+    (0x0980, 0x09FF, "Bengali"),     # Bengali / Assamese
+    (0x0A00, 0x0A7F, "Punjabi"),     # Gurmukhi
+    (0x0A80, 0x0AFF, "Gujarati"),    # Gujarati
+    (0x0B00, 0x0B7F, "Odia"),        # Odia
+    (0x0B80, 0x0BFF, "Tamil"),       # Tamil
+    (0x0C00, 0x0C7F, "Telugu"),      # Telugu
+    (0x0C80, 0x0CFF, "Kannada"),     # Kannada
+    (0x0D00, 0x0D7F, "Malayalam"),   # Malayalam
+]
+
+# Common greetings & keywords in Indian languages for heuristic matching
+_HINDI_KEYWORDS = {
+    "नमस्ते", "मदद", "धन्यवाद", "कृपया", "हेल्प", "ऑर्डर", "रिफंड",
+    "शिकायत", "भुगतान", "खाता", "बिल", "वापसी", "ट्रैक", "डिलीवरी",
+    "शिपिंग", "सहायता", "जानकारी", "स्थिति", "समस्या", "हां", "नहीं",
+}
+_MARATHI_KEYWORDS = {
+    "नमस्कार", "मदत", "धन्यवाद", "कृपया", "ऑर्डर", "तक्रार",
+    "बिल", "परतावा", "खाते", "पैसे", "माहिती", "स्थिती", "समस्या",
+    "डिलिव्हरी", "शिपिंग", "सहाय्य", "होय", "नाही", "पावती",
 }
 
 SENTIMENT = SentimentIntensityAnalyzer()
 
 
+def _detect_script(text: str) -> str | None:
+    """Detect language based on Unicode script of non-ASCII characters."""
+    script_counts: dict[str, int] = {}
+    for char in text:
+        cp = ord(char)
+        for start, end, lang in _SCRIPT_RANGES:
+            if start <= cp <= end:
+                script_counts[lang] = script_counts.get(lang, 0) + 1
+                break
+
+    if not script_counts:
+        return None
+
+    # Return the script with the most characters
+    return max(script_counts, key=script_counts.get)
+
+
+def _detect_hindi_vs_marathi(text: str) -> str:
+    """Disambiguate Hindi vs Marathi since both use Devanagari script."""
+    lower = text.lower()
+    hi_score = sum(1 for kw in _HINDI_KEYWORDS if kw in lower)
+    mr_score = sum(1 for kw in _MARATHI_KEYWORDS if kw in lower)
+
+    # Marathi-specific characters: ळ (ḷa) is very common in Marathi but rare in Hindi
+    if "ळ" in text:
+        mr_score += 3
+
+    # Common Marathi verb endings
+    marathi_endings = ["ते", "ता", "णे", "ला", "ची", "चे", "चा"]
+    for ending in marathi_endings:
+        if text.endswith(ending) or f" {ending} " in text:
+            mr_score += 1
+
+    if mr_score > hi_score:
+        return "Marathi"
+    return "Hindi"
+
+
 def detect_language(text: str) -> str:
-    """Detect language with heuristics for short strings and common keywords."""
+    """
+    Detect language with multilingual support for 10+ Indian languages.
+
+    Detection strategy (priority order):
+    1. Common English greetings (fast path)
+    2. Unicode script-based detection (reliable for Indian scripts)
+    3. Hindi vs Marathi disambiguation (both use Devanagari)
+    4. langdetect library (statistical n-gram approach)
+    5. Default to English
+    """
     lower = text.lower().strip()
-    
-    # Heuristic 1: Very short strings or common English greetings
-    common_en = {"hello", "hi", "hey", "help", "thanks", "thank you", "bye", "test"}
+
+    # Heuristic 1: Very short ASCII strings or common English greetings
+    common_en = {"hello", "hi", "hey", "help", "thanks", "thank you", "bye", "test",
+                 "yes", "no", "ok", "okay", "sure", "done"}
     if len(lower) < 5 or lower in common_en:
         return "English"
 
-    # Heuristic 2: Only ASCII characters usually implies English in this context
+    # Heuristic 2: Only ASCII characters usually implies English
     if all(ord(c) < 128 for c in text) and len(text.split()) < 4:
         return "English"
 
+    # Heuristic 3: Script-based detection (very reliable for Indian languages)
+    script_lang = _detect_script(text)
+    if script_lang:
+        # Devanagari is shared by Hindi, Marathi, Sanskrit, Nepali
+        if script_lang == "Hindi":
+            return _detect_hindi_vs_marathi(text)
+        return script_lang
+
+    # Heuristic 4: langdetect statistical detection
     try:
         code = detect(text)
     except LangDetectException:
         return "English"
-    
+
     return LANG_MAP.get(code, code)
 
 
@@ -81,22 +180,90 @@ def scrub_pii(text: str) -> tuple[str, list[str]]:
 
 
 def extract_intent(text: str) -> str:
-    """Rule-based intent classification with expanded keyword coverage."""
+    """
+    Rule-based intent classification with multilingual keyword coverage.
+    Supports English, Hindi (हिन्दी), Marathi (मराठी), Bengali (বাংলা),
+    Tamil (தமிழ்), and Telugu (తెలుగు) keywords.
+    """
     lower = text.lower()
-    if any(w in lower for w in ["refund", "return", "policy", "eligibility", "warranty"]):
+
+    # Policy / Refund / Return
+    if any(w in lower for w in [
+        "refund", "return", "policy", "eligibility", "warranty",
+        "वापसी", "रिफंड", "नीति", "पॉलिसी", "वारंटी",             # Hindi
+        "परतावा", "धोरण", "हमी",                                    # Marathi
+        "ফেরত", "নীতি",                                             # Bengali
+        "திரும்ப", "கொள்கை",                                         # Tamil
+        "రిటర్న్", "విధానం",                                          # Telugu
+    ]):
         return "policy_query"
-    if any(w in lower for w in ["bill", "invoice", "payment", "charged", "fee", "cost", "price"]):
+
+    # Billing / Payment
+    if any(w in lower for w in [
+        "bill", "invoice", "payment", "charged", "fee", "cost", "price",
+        "बिल", "भुगतान", "शुल्क", "कीमत", "चार्ज",                # Hindi
+        "बिल", "पैसे", "शुल्क", "किंमत",                           # Marathi
+        "বিল", "পেমেন্ট", "মূল্য",                                   # Bengali
+        "கட்டணம்", "பில்",                                           # Tamil
+        "బిల్లు", "చెల్లింపు",                                         # Telugu
+    ]):
         return "billing"
-    if any(w in lower for w in ["urgent", "emergency", "911", "critical", "immediately"]):
+
+    # Emergency
+    if any(w in lower for w in [
+        "urgent", "emergency", "911", "critical", "immediately",
+        "आपातकालीन", "तुरंत", "जरूरी", "एमरजेंसी",                # Hindi
+        "आणीबाणी", "तातडीचे",                                       # Marathi
+        "জরুরি", "আপাতকালীন",                                       # Bengali
+        "அவசரம்",                                                    # Tamil
+        "అత్యవసరం",                                                  # Telugu
+    ]):
         return "emergency"
-    if any(w in lower for w in ["angry", "complaint", "frustrated", "bad service", "terrible", "worst"]):
+
+    # Complaint
+    if any(w in lower for w in [
+        "angry", "complaint", "frustrated", "bad service", "terrible", "worst",
+        "शिकायत", "गुस्सा", "खराब", "बेकार",                       # Hindi
+        "तक्रार", "वाईट", "भयंकर",                                   # Marathi
+        "অভিযোগ", "রাগ",                                             # Bengali
+        "புகார்",                                                     # Tamil
+        "ఫిర్యాదు",                                                   # Telugu
+    ]):
         return "complaint"
-    if any(w in lower for w in ["order", "track", "shipment", "delivery", "shipping", "dispatch"]):
+
+    # Order Status / Tracking
+    if any(w in lower for w in [
+        "order", "track", "shipment", "delivery", "shipping", "dispatch",
+        "ऑर्डर", "ट्रैक", "डिलीवरी", "शिपमेंट",                    # Hindi
+        "ऑर्डर", "ट्रॅक", "डिलिव्हरी",                              # Marathi
+        "অর্ডার", "ডেলিভারি", "ট্র্যাক",                             # Bengali
+        "ஆர்டர்", "டெலிவரி",                                        # Tamil
+        "ఆర్డర్", "డెలివరీ",                                          # Telugu
+    ]):
         return "order_status"
-    if any(w in lower for w in ["appointment", "schedule", "book", "reserve", "slot"]):
+
+    # Scheduling / Appointment
+    if any(w in lower for w in [
+        "appointment", "schedule", "book", "reserve", "slot",
+        "अपॉइंटमेंट", "बुक", "समय", "स्लॉट",                       # Hindi
+        "अपॉइंटमेंट", "बुक", "वेळ",                                  # Marathi
+        "অ্যাপয়েন্টমেন্ট", "বুক",                                    # Bengali
+        "முன்பதிவு", "நேரம்",                                        # Tamil
+        "అపాయింట్మెంట్", "బుక్",                                      # Telugu
+    ]):
         return "scheduling"
-    if any(w in lower for w in ["account", "login", "password", "sign up", "register"]):
+
+    # Account
+    if any(w in lower for w in [
+        "account", "login", "password", "sign up", "register",
+        "खाता", "लॉगिन", "पासवर्ड", "रजिस्टर",                    # Hindi
+        "खाते", "लॉगिन", "पासवर्ड", "नोंदणी",                      # Marathi
+        "অ্যাকাউন্ট", "লগইন",                                       # Bengali
+        "கணக்கு", "பதிவு",                                           # Tamil
+        "ఖాతా", "లాగిన్",                                            # Telugu
+    ]):
         return "account"
+
     return "general"
 
 

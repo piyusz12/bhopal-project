@@ -1,11 +1,25 @@
 import { useState, useRef } from "react";
 
 const LANG_CODES = {
+  // ─── Indian Languages ───────────────────────
+  Hindi: "hi-IN",
+  Marathi: "mr-IN",
+  Bengali: "bn-IN",
+  Tamil: "ta-IN",
+  Telugu: "te-IN",
+  Kannada: "kn-IN",
+  Gujarati: "gu-IN",
+  Malayalam: "ml-IN",
+  Punjabi: "pa-IN",
+  Odia: "or-IN",
+  Urdu: "ur-IN",
+  Nepali: "ne-NP",
+  Assamese: "as-IN",
+  // ─── International Languages ────────────────
   English: "en-US",
   Spanish: "es-ES",
   French: "fr-FR",
   German: "de-DE",
-  Hindi: "hi-IN",
   Arabic: "ar-SA",
   Portuguese: "pt-BR",
   Chinese: "zh-CN",
@@ -13,6 +27,7 @@ const LANG_CODES = {
   Korean: "ko-KR",
   Russian: "ru-RU",
   Italian: "it-IT",
+  Sinhala: "si-LK",
 };
 
 export function useVoice(lang, log) {

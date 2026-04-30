@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import "./App.css";
-import { DOMAINS } from "./constants";
+import { DOMAINS, SUPPORTED_LANGUAGES } from "./constants";
 import { useChat } from "./hooks/useChat";
 import { useVoice } from "./hooks/useVoice";
 import { useQueryHistory } from "./hooks/useQueryHistory";
@@ -18,6 +18,7 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [telemetryOpen, setTelemetryOpen] = useState(true);
+  const [selectedLang, setSelectedLang] = useState("auto");
   const chatRef = useRef(null);
   const telemRef = useRef(null);
   const inputRef = useRef(null);
@@ -44,7 +45,12 @@ export default function App() {
     handleSend,
   } = useChat(domain, log);
 
-  const { listening, speak, toggleVoiceInput } = useVoice(lang, log);
+  // Resolve effective language: if user explicitly chose one, use it; otherwise auto-detected
+  const effectiveLang = selectedLang === "auto"
+    ? lang
+    : (SUPPORTED_LANGUAGES.find(l => l.code === selectedLang)?.label || lang);
+
+  const { listening, speak, toggleVoiceInput } = useVoice(effectiveLang, log);
 
   const {
     history,
@@ -142,8 +148,10 @@ export default function App() {
           ),
         }}
         sentiment={sentiment}
-        lang={lang}
+        lang={effectiveLang}
         accent={accent}
+        selectedLang={selectedLang}
+        onLangChange={setSelectedLang}
       />
 
       <div className={`main-split${telemetryOpen ? '' : ' telemetry-collapsed'}`}>

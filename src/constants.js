@@ -81,3 +81,29 @@ export const INTENT_ICONS = {
 };
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8001";
+
+export const SUPPORTED_LANGUAGES = [
+  // ─── Top 10 Indian Languages (Auto-detect supported) ───
+  { code: "auto", label: "🌐 Auto-detect", native: "Auto" },
+  { code: "hi", label: "Hindi", native: "हिन्दी", flag: "🇮🇳" },
+  { code: "mr", label: "Marathi", native: "मराठी", flag: "🇮🇳" },
+  { code: "bn", label: "Bengali", native: "বাংলা", flag: "🇮🇳" },
+  { code: "ta", label: "Tamil", native: "தமிழ்", flag: "🇮🇳" },
+  { code: "te", label: "Telugu", native: "తెలుగు", flag: "🇮🇳" },
+  { code: "kn", label: "Kannada", native: "ಕನ್ನಡ", flag: "🇮🇳" },
+  { code: "gu", label: "Gujarati", native: "ગુજરાતી", flag: "🇮🇳" },
+  { code: "ml", label: "Malayalam", native: "മലയാളം", flag: "🇮🇳" },
+  { code: "pa", label: "Punjabi", native: "ਪੰਜਾਬੀ", flag: "🇮🇳" },
+  { code: "or", label: "Odia", native: "ଓଡ଼ିଆ", flag: "🇮🇳" },
+  // ─── International ─────────────────────────────────────
+  { code: "en", label: "English", native: "English", flag: "🇺🇸" },
+  { code: "es", label: "Spanish", native: "Español", flag: "🇪🇸" },
+  { code: "fr", label: "French", native: "Français", flag: "🇫🇷" },
+  { code: "de", label: "German", native: "Deutsch", flag: "🇩🇪" },
+  { code: "ar", label: "Arabic", native: "العربية", flag: "🇸🇦" },
+  { code: "ja", label: "Japanese", native: "日本語", flag: "🇯🇵" },
+  { code: "ko", label: "Korean", native: "한국어", flag: "🇰🇷" },
+  { code: "ru", label: "Russian", native: "Русский", flag: "🇷🇺" },
+  { code: "zh", label: "Chinese", native: "中文", flag: "🇨🇳" },
+  { code: "pt", label: "Portuguese", native: "Português", flag: "🇧🇷" },
+];

@@ -1,8 +1,8 @@
 import React from "react";
-import { C } from "../constants";
+import { C, SUPPORTED_LANGUAGES } from "../constants";
 import { MetCard } from "./MetCard";
 
-export function MetricsBar({ metrics, sentiment, lang, accent }) {
+export function MetricsBar({ metrics, sentiment, lang, accent, selectedLang, onLangChange }) {
   return (
     <div className="metrics-bar" role="status" aria-label="System metrics">
       <MetCard label="Queries" value={metrics.queries} color={accent} />
@@ -14,6 +14,28 @@ export function MetricsBar({ metrics, sentiment, lang, accent }) {
         value={metrics.lastRouting || "—"}
         color={metrics.lastRouting === "deep" ? C.purple : C.blue}
       />
+
+      {/* Language Selector */}
+      <div className="lang-selector-card met-card" style={{ minWidth: 140 }}>
+        <div className="lang-selector-header">
+          <span className="lang-selector-icon">🌐</span>
+          <select
+            className="lang-select"
+            value={selectedLang}
+            onChange={(e) => onLangChange(e.target.value)}
+            aria-label="Select response language"
+            title="Choose response language"
+          >
+            {SUPPORTED_LANGUAGES.map((l, i) => (
+              <option key={l.code} value={l.code}>
+                {l.flag ? `${l.flag} ` : ""}{l.label} {l.native !== l.label && l.native !== "Auto" ? `(${l.native})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="met-label">LANGUAGE</div>
+      </div>
+
       {sentiment && (
         <div
           className="sentiment-card fade-in"
