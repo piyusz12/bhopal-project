@@ -95,6 +95,17 @@ export function Bubble({ msg, accent }) {
           </div>
         )}
 
+        {msg.metadata?.ner_entities?.length > 0 && (
+          <div className="ner-entities-container" style={{ marginTop: "10px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "11px", color: C.muted, alignSelf: "center", textTransform: "uppercase", letterSpacing: "0.5px" }}>Extracted Entities:</span>
+            {msg.metadata.ner_entities.map((ent, i) => (
+              <span key={i} className="meta-chip" style={{ background: accent + "10", color: accent, borderColor: accent + "25", fontSize: "11px" }}>
+                <strong>{ent.type}:</strong> {ent.value}
+              </span>
+            ))}
+          </div>
+        )}
+
         {!isUser && !isStreaming && msg.content && (
           <div className="bubble-actions">
             <button

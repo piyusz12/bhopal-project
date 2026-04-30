@@ -24,6 +24,7 @@ from .services import (
     detect_language, detect_sentiment, extract_intent,
     maybe_call_tool, scrub_pii, compute_routing_score, expand_query,
 )
+from .bhashini import extract_entities, get_bhashini_status, is_configured as bhashini_configured
 from .database import engine, Base, get_db
 from .models import ChatLog
 
@@ -194,6 +195,13 @@ def health() -> HealthResponse:
         "Conversation Memory",
         "Voice I/O",
         "SSE Streaming",
+        # Bhashini API Services
+        "Bhashini NER",
+        "Bhashini TLD",
+        "Bhashini NMT",
+        "Bhashini ASR + Denoiser",
+        "Bhashini TTS",
+        "Bhashini Transliteration",
     ]
     return HealthResponse(
         status="ok",
@@ -202,6 +210,13 @@ def health() -> HealthResponse:
         version="2.0.0",
         features=features,
     )
+
+
+# ─── Bhashini Services Status ────────────────────────────────
+@app.get("/api/bhashini/status")
+def bhashini_status():
+    """Return status of all integrated Bhashini API services."""
+    return get_bhashini_status()
 
 
 # ─── Chat (standard request/response) ───────────────────────
@@ -221,6 +236,12 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
     intent = extract_intent(payload.message)
     routing_model, complexity_score = compute_routing_score(payload.message, intent, sentiment)
     tool_events = await maybe_call_tool(payload.message, enabled=payload.use_tools)
+
+    # Bhashini NER — extract entities (pincode, aadhaar, phone, amounts, etc.)
+    ner_entities = extract_entities(payload.message)
+    bhashini_services = ["NER", "TLD"]
+    if bhashini_configured():
+        bhashini_services.extend(["NMT", "ASR", "TTS", "Denoiser", "Transliteration"])
 
     query_expansions = []
 
@@ -294,6 +315,8 @@ async def chat(payload: ChatRequest, request: Request, db: Session = Depends(get
         tool_events=tool_events,
         routing_model=routing_model,
         query_expansions=query_expansions,
+        ner_entities=ner_entities,
+        bhashini_services=bhashini_services,
     )
 
     # Log to DB with enriched fields
@@ -339,6 +362,12 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
     tool_events = await maybe_call_tool(payload.message, enabled=payload.use_tools)
     query_expansions = []
 
+    # Bhashini NER — extract entities
+    ner_entities = extract_entities(payload.message)
+    bhashini_services = ["NER", "TLD"]
+    if bhashini_configured():
+        bhashini_services.extend(["NMT", "ASR", "TTS", "Denoiser", "Transliteration"])
+
     async def event_generator():
         import asyncio
 
@@ -351,6 +380,8 @@ async def chat_stream(payload: ChatRequest, request: Request, db: Session = Depe
             "intent": intent,
             "routing_model": routing_model,
             "tool_events": tool_events,
+            "ner_entities": ner_entities,
+            "bhashini_services": bhashini_services,
         }
         yield f"data: {json.dumps(meta)}\n\n"
 

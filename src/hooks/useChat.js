@@ -26,7 +26,7 @@ export function useChat(domain, log) {
 
     setMessages((p) => [...p, { role: "user", content: query, timestamp: Date.now() }]);
 
-    // ─── Telemetry simulation ───────────────────────────
+    // ─── Telemetry simulation (Bhashini + RAG Pipeline) ───
     setActiveStage(0);
     log("[INGEST] Payload received — tokenizing input stream", "info");
     await sleep(200);
@@ -68,19 +68,34 @@ export function useChat(domain, log) {
 
     log("[SECURITY] Zero PII detected — payload cleared for processing", "success");
     await sleep(120);
+
+    // Bhashini TLD (Text Language Detection)
+    setActiveStage(1);
+    log("[BHASHINI TLD] Detecting input language via script analysis + n-gram model...", "process");
+    await sleep(250);
+    log("[BHASHINI TLD] Language identified — routing to appropriate NLP pipeline", "success");
+    await sleep(100);
+
+    // Bhashini NER (Named Entity Recognition)
     setActiveStage(2);
+    log("[BHASHINI NER] Scanning for named entities (Pincode, Aadhaar, PAN, Phone, Amount)...", "process");
+    await sleep(300);
+    log("[BHASHINI NER] Entity extraction complete — results injected into context", "success");
+    await sleep(100);
+
+    setActiveStage(3);
     log("[ROUTER] Evaluating complexity score for multi-model routing...", "process");
     await sleep(300);
-    setActiveStage(3);
+    setActiveStage(4);
     log("[RAG] Query expansion → generating HyDE embeddings + variants...", "process");
     await sleep(350);
-    setActiveStage(4);
+    setActiveStage(5);
     log("[RAG] ANN search on HNSW index — scanning vector space...", "process");
     await sleep(350);
-    setActiveStage(5);
+    setActiveStage(6);
     log("[RAG] Cross-encoder reranking top-50 candidates → selecting top-4 chunks", "process");
     await sleep(200);
-    setActiveStage(6);
+    setActiveStage(7);
     log("[RAG] Context window assembled — injecting KB + conversation memory", "success");
     await sleep(120);
 

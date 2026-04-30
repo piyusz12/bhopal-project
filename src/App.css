@@ -561,6 +561,8 @@ body {
   flex-direction: column;
   border-right: 1px solid var(--glass-border);
   position: relative;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .chat-header {

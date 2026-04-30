@@ -21,6 +21,8 @@ class ChatResponse(BaseModel):
     tool_events: list[str]
     routing_model: str = "fast"
     query_expansions: list[str] = []
+    ner_entities: list[dict] = []
+    bhashini_services: list[str] = []
 
 
 class HealthResponse(BaseModel):

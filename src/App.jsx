@@ -110,7 +110,13 @@ export default function App() {
   }, [domain]);
 
   useEffect(() => {
-    chatRef.current?.scrollTo(0, chatRef.current.scrollHeight);
+    // Use rAF + small delay to ensure DOM has rendered the new content
+    const frame = requestAnimationFrame(() => {
+      if (chatRef.current) {
+        chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      }
+    });
+    return () => cancelAnimationFrame(frame);
   }, [messages, loading]);
 
   useEffect(() => {

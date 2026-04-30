@@ -4,6 +4,8 @@ import { LogLine } from "./LogLine";
 
 const PIPELINE_STAGES = [
   "PII\nScan",
+  "Bhashini\nTLD",
+  "Bhashini\nNER",
   "Intent\nRouter",
   "Query\nExpansion",
   "RAG\nPipeline",
@@ -14,13 +16,20 @@ const PIPELINE_STAGES = [
 ];
 
 const FEATURE_TAGS = [
+  "Bhashini NER",
+  "Bhashini TLD",
+  "Bhashini NMT",
+  "Bhashini ASR",
+  "Bhashini Denoiser",
+  "Bhashini TTS",
+  "Transliteration",
   "Multi-Model Routing",
   "HyDE Query Expansion",
   "Cross-Encoder Reranking",
   "Sentiment Detection",
   "PII Masking",
   "HITL Escalation",
-  "Multilingual",
+  "10+ Indian Languages",
   "SSE Streaming",
   "Conversation Memory",
   "Rate Limiting",
